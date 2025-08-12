@@ -2,6 +2,7 @@
 @php
     /** @var \App\Models\Company|null $company */
     $isEdit = isset($company) && $company?->id;
+    $selectedPlanId = old('plan_id', $activePlanId ?? null);
 @endphp
 
 <div class="row g-4">
@@ -9,10 +10,10 @@
     <div class="col-xl-8">
         <div class="card">
             <div class="card-header align-items-center d-flex">
-                <h4 class="card-title mb-0 flex-grow-1">Información básica</h4>
+                <h4 class="card-title mb-0 flex-grow-1">{{ $isEdit ? 'Datos de la empresa' : 'Nueva empresa' }}</h4>
             </div>
             <div class="card-body">
-                {{-- Errores --}}
+                {{-- Errores de validación --}}
                 @if ($errors->any())
                     <div class="alert alert-danger">
                         <div class="fw-semibold mb-2">Revisa los campos:</div>
@@ -26,10 +27,10 @@
 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">Nombre de la empresa <span class="text-danger">*</span></label>
+                        <label class="form-label">Nombre <span class="text-danger">*</span></label>
                         <input type="text" class="form-control" name="name" id="name"
                                value="{{ old('name', $company->name ?? '') }}"
-                               placeholder="Ej: Alcaldía de Magdalena" required>
+                               placeholder="Ej: Alcaldía del Magdalena" required>
                     </div>
 
                     <div class="col-md-6">
@@ -37,18 +38,24 @@
                         <input type="text" class="form-control" name="slug" id="slug"
                                value="{{ old('slug', $company->slug ?? '') }}"
                                placeholder="Se genera a partir del nombre">
-                        <div class="form-text">Ejemplo: <code>openpqr.com.co/tuempresa</code></div>
+                        <div class="form-text">Ej: <code>openpqr.com.co/tuempresa</code></div>
                     </div>
 
                     <div class="col-md-6">
                         <label class="form-label">Sector</label>
+                        @php
+                            $sectores = [
+                                'publica'   => 'Entidad pública',
+                                'salud'     => 'Salud',
+                                'retail'    => 'Retail',
+                                'servicios' => 'Servicios',
+                                'educacion' => 'Educación',
+                                'tecnologia'=> 'Tecnología',
+                                'otros'     => 'Otros',
+                            ];
+                            $sectorVal = old('sector', $company->sector ?? '');
+                        @endphp
                         <select class="form-select" name="sector">
-                            @php
-                                $sectores = ['publica' => 'Entidad pública','salud'=>'Salud',
-                                             'retail'=>'Retail','servicios'=>'Servicios',
-                                             'educacion'=>'Educación','tecnologia'=>'Tecnología','otros'=>'Otros'];
-                                $sectorVal = old('sector', $company->sector ?? '');
-                            @endphp
                             <option value="">Seleccione</option>
                             @foreach($sectores as $k => $v)
                                 <option value="{{ $k }}" @selected($sectorVal===$k)>{{ $v }}</option>
@@ -59,7 +66,7 @@
                     <div class="col-md-6">
                         <label class="form-label">Color primario</label>
                         <div class="d-flex gap-2">
-                            <input type="color" class="form-control form-control-color" style="width: 3rem;"
+                            <input type="color" class="form-control form-control-color" style="width:3rem"
                                    value="{{ old('color_primary', $company->color_primary ?? '#1e88e5') }}"
                                    id="color_picker">
                             <input type="text" class="form-control" name="color_primary" id="color_primary"
@@ -69,7 +76,7 @@
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label">Email de contacto</label>
+                        <label class="form-label">Correo de contacto</label>
                         <input type="email" class="form-control" name="email_contact"
                                value="{{ old('email_contact', $company->email_contact ?? '') }}"
                                placeholder="contacto@empresa.com">
@@ -94,97 +101,95 @@
             </div>
         </div>
 
-        {{-- En create muestra aviso de plan default --}}
+        {{-- Aviso de plan por defecto en CREATE --}}
         @unless($isEdit)
             <div class="alert alert-info">
-                Al crear la empresa quedará con el plan <b>Startup</b> por defecto. Podrás cambiarlo luego.
+                La empresa iniciará con el plan <b>Startup</b> (puedes elegir otro aquí abajo).
             </div>
         @endunless
-    </div>
 
-    {{-- Columna derecha --}}
-    <div class="col-xl-4">
-        {{-- Logo --}}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Logo</h5>
-            </div>
-            <div class="card-body">
-                @if(!empty($company?->logo_url))
-                    <div class="mb-3">
-                        <img src="{{ $company->logo_url }}" alt="Logo actual"
-                             class="img-fluid rounded border">
-                    </div>
-                @endif
-                <input type="file" class="form-control" name="logo" accept="image/*">
-                <div class="form-text">PNG/JPG, recomendado ~512x512.</div>
-            </div>
-        </div>
-
-        {{-- Banner --}}
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="card-title mb-0">Banner</h5>
-            </div>
-            <div class="card-body">
-                @if(!empty($company?->banner_url))
-                    <div class="mb-3">
-                        <img src="{{ $company->banner_url }}" alt="Banner actual"
-                             class="img-fluid rounded border">
-                    </div>
-                @endif
-                <input type="file" class="form-control" name="banner" accept="image/*">
-                <div class="form-text">PNG/JPG, recomendado ~1200x300.</div>
-            </div>
-        </div>
-
-        {{-- En EDIT: bloque para cambio de plan (si el controlador ya pasa $plans y $activePlanId) --}}
+        {{-- Selección de plan (en create y edit) --}}
         @isset($plans)
         <div class="card">
             <div class="card-header">
                 <h5 class="card-title mb-0">Plan</h5>
             </div>
             <div class="card-body">
-                <form action="{{ route('admin.companies.updatePlan', $company) }}" method="post" class="row g-2">
-                    @csrf @method('PATCH')
-                    <div class="col-12">
-                        <select name="plan_id" class="form-select">
-                            @foreach($plans as $p)
-                                <option value="{{ $p->id }}" @selected(($activePlanId ?? null)===$p->id)>
-                                    {{ $p->name }} — ${{ number_format($p->price,0,',','.') }}
-                                </option>
-                            @endforeach
-                        </select>
+                <select name="plan_id" class="form-select">
+                    @foreach($plans as $p)
+                        <option value="{{ $p->id }}" {{ (string)$selectedPlanId === (string)$p->id ? 'selected' : '' }}>
+                            {{ $p->name }} —
+                            @if(is_null($p->price) || $p->price == 0)
+                                Gratis
+                            @else
+                                ${{ number_format($p->price,0,',','.') }}/mes
+                            @endif
+                        </option>
+                    @endforeach
+                </select>
+                @if($isEdit)
+                    <div class="form-text mt-2">
+                        Al guardar, si cambias el plan, se cerrará la suscripción activa y se abrirá una nueva.
                     </div>
-                    <div class="col-12 text-end">
-                        <button class="btn btn-outline-primary"><i class="ri-refresh-line"></i> Cambiar plan</button>
-                    </div>
-                </form>
+                @endif
             </div>
         </div>
         @endisset
     </div>
+
+    {{-- Columna derecha: archivos --}}
+    <div class="col-xl-4">
+        {{-- Logo --}}
+        <div class="card mb-4">
+            <div class="card-header"><h5 class="card-title mb-0">Logo</h5></div>
+            <div class="card-body">
+                @if($isEdit && !empty($company?->logo_url))
+                    <div class="mb-2">
+                        <img src="{{ asset(str_starts_with($company->logo_url,'storage/') ? $company->logo_url : ('storage/'.$company->logo_url)) }}"
+                             class="img-fluid rounded border" alt="Logo" style="max-height:80px">
+                    </div>
+                @endif
+                <input type="file" class="form-control" name="logo" accept="image/*">
+                <div class="form-text">PNG/JPG. Recomendado ~512x512. Máx 2MB.</div>
+            </div>
+        </div>
+
+        {{-- Banner --}}
+        <div class="card">
+            <div class="card-header"><h5 class="card-title mb-0">Banner</h5></div>
+            <div class="card-body">
+                @if($isEdit && !empty($company?->banner_url))
+                    <div class="mb-2">
+                        <img src="{{ asset(str_starts_with($company->banner_url,'storage/') ? $company->banner_url : ('storage/'.$company->banner_url)) }}"
+                             class="img-fluid rounded border" alt="Banner" style="max-height:140px">
+                    </div>
+                @endif
+                <input type="file" class="form-control" name="banner" accept="image/*">
+                <div class="form-text">PNG/JPG. Recomendado ~1200x300. Máx 4MB.</div>
+            </div>
+        </div>
+    </div>
 </div>
 
-{{-- Botones pie --}}
+{{-- Botonera pie --}}
 <div class="mt-4 d-flex gap-2">
     <a href="{{ route('admin.companies.index') }}" class="btn btn-soft-secondary">Cancelar</a>
     <button class="btn btn-primary">
-        <i class="ri-save-3-line"></i> {{ $isEdit ? 'Actualizar' : 'Crear empresa' }}
+        <i class="ri-save-3-line me-1"></i> {{ $isEdit ? 'Actualizar' : 'Crear empresa' }}
     </button>
 </div>
 
-{{-- Helpers UI --}}
 @push('scripts')
 <script>
-    // sin dependencia externa: slug desde name
+    // Autogenerar slug desde nombre si el campo slug está vacío
     const elName  = document.getElementById('name');
     const elSlug  = document.getElementById('slug');
     const elPick  = document.getElementById('color_picker');
     const elColor = document.getElementById('color_primary');
 
-    if (elName && elSlug && !elSlug.value) {
+    if (elName && elSlug) {
         elName.addEventListener('input', () => {
+            if (elSlug.value.trim() !== '') return;
             const s = elName.value
                 .toLowerCase()
                 .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // quita acentos
@@ -193,6 +198,7 @@
             elSlug.value = s;
         });
     }
+
     if (elPick && elColor) {
         elPick.addEventListener('input', () => elColor.value = elPick.value);
         elColor.addEventListener('input', () => elPick.value = elColor.value);
