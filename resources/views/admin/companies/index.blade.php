@@ -51,7 +51,7 @@
             <tbody>
             @forelse($companies as $company)
                 @php
-                    $sub = $company->activeSubscription;
+                    $sub = $company->activeSubscription; // relación helper
                     $plan = $sub?->plan;
                 @endphp
                 <tr>
@@ -115,6 +115,7 @@
                                 <i class="ri-edit-2-line"></i> Editar
                             </a>
 
+                            {{-- Cambiar plan (modal) --}}
                             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#changePlanModal-{{ $company->id }}">
                                 <i class="ri-shuffle-line"></i> Cambiar plan
                             </button>
