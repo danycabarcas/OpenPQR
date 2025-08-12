@@ -19,28 +19,23 @@ class CompanyController extends Controller
     */
     public function index(Request $request)
     {
-        $q = Company::query();
+        $q = Company::query()
+            ->with(['activeSubscription.plan']) // si ya lo tenías, perfecto
+            ->when($request->filled('q'), function ($query) use ($request) {
+                $s = trim($request->q);
+                $query->where(function ($q2) use ($s) {
+                    $q2->where('name', 'like', "%{$s}%")
+                    ->orWhere('slug', 'like', "%{$s}%");
+                });
+            })
+            ->orderBy('name');
 
-        // búsqueda por texto (name/slug)
-        if ($search = trim((string) $request->input('q', ''))) {
-            $q->where(function ($qq) use ($search) {
-                $qq->where('name', 'like', "%{$search}%")
-                   ->orWhere('slug', 'like', "%{$search}%");
-            });
-        }
+        $companies = $q->paginate(12)->withQueryString();
 
-        // filtro por estado (active/inactive)
-        if ($request->filled('status')) {
-            if ($request->status === 'active') {
-                $q->where('is_active', true);
-            } elseif ($request->status === 'inactive') {
-                $q->where('is_active', false);
-            }
-        }
+        // <- ESTA LÍNEA ES LA CLAVE
+        $plans = Plan::orderBy('price')->get(['id','name','price']);
 
-        $companies = $q->latest()->paginate(12)->withQueryString();
-
-        return view('admin.companies.index', compact('companies'));
+        return view('admin.companies.index', compact('companies','plans'));
     }
 
     /*
