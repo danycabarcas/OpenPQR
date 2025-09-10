@@ -1,11 +1,18 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
+
 use Illuminate\Support\Facades\Route;
+
+// IMPORTS DE CONTROLLERS
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\PlanController;
-use App\Http\Controllers\Public\SignupController;
 use App\Http\Controllers\Admin\CompanyController;
 
+// ⚠️ Usa el que tengas realmente:
+// Si tu controlador está en: app/Http/Controllers/Public/SignupController.php
+use App\Http\Controllers\Public\SignupController;
+// Si lo cambiaste a PublicSite:
+// use App\Http\Controllers\PublicSite\SignupController;
 
 /*
 |--------------------------------------------------------------------------

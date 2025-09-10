@@ -2,6 +2,21 @@
 
 <div class="row g-3">
 
+
+{{-- NIT --}}
+<div class="col-md-6">
+  <label class="form-label">NIT</label>
+  <input type="text" name="nit" class="form-control"
+         value="{{ old('nit', $company->nit ?? '') }}">
+  @error('nit') <small class="text-danger">{{ $message }}</small> @enderror
+</div>
+
+
+
+
+
+
+
   {{-- Nombre --}}
   <div class="col-md-6">
     <label class="form-label">Nombre de la empresa *</label>
@@ -50,6 +65,24 @@
            value="{{ old('phone_contact', $company->phone_contact ?? '') }}">
     @error('phone_contact') <small class="text-danger">{{ $message }}</small> @enderror
   </div>
+
+{{-- Ciudad --}}
+<div class="col-md-6">
+  <label class="form-label">Ciudad</label>
+  <input type="text" name="city" class="form-control"
+         value="{{ old('city', $company->city ?? '') }}">
+  @error('city') <small class="text-danger">{{ $message }}</small> @enderror
+</div>
+
+{{-- Dirección --}}
+<div class="col-md-6">
+  <label class="form-label">Dirección</label>
+  <input type="text" name="address" class="form-control"
+         value="{{ old('address', $company->address ?? '') }}">
+  @error('address') <small class="text-danger">{{ $message }}</small> @enderror
+</div>
+
+
 
   {{-- Color primario (mantengo tu selector de color + el hex sincronizados) --}}
   <div class="col-md-6">

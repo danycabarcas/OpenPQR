@@ -19,11 +19,15 @@ class Company extends Model
         'name',
         'slug',
         'sector',
-        'email_contact',
-        'phone_contact',
-        'color_primary',
         'logo_url',
         'banner_url',
+        'color_primary',
+        'email_contact',
+        'phone_contact',
+        'address',
+        'city',
+        'nit',
+        'plan_id',
         'is_active',
     ];
 

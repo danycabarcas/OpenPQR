@@ -1,6 +1,5 @@
 
 <?php
-// app/Http/Controllers/Public/SignupController.php
 namespace App\Http\Controllers\Public;
 
 use App\Http\Controllers\Controller;

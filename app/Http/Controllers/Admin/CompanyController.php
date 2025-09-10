@@ -7,199 +7,282 @@ use App\Models\Company;
 use App\Models\Plan;
 use App\Models\Subscription;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
-
-// Si instalaste Intervention Image:
-use Intervention\Image\Laravel\Facades\Image;
 
 class CompanyController extends Controller
 {
-    // Listado
+    /**
+     * Listado con búsqueda. Pasa $plans para el modal de cambio de plan.
+     */
     public function index(Request $request)
     {
-        $q = trim((string) $request->get('q'));
+        $search = trim((string) $request->get('q', ''));
 
         $companies = Company::query()
-            ->with('activeSubscription')
-            ->when($q, function ($query) use ($q) {
-                $query->where(function ($qq) use ($q) {
-                    $qq->where('name', 'like', "%{$q}%")
-                       ->orWhere('slug', 'like', "%{$q}%")
-                       ->orWhere('email_contact', 'like', "%{$q}%");
+            ->with(['activeSubscription'])
+            ->when($search !== '', function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('name', 'like', "%{$search}%")
+                       ->orWhere('slug', 'like', "%{$search}%")
+                       ->orWhere('email_contact', 'like', "%{$search}%")
+                       ->orWhere('phone_contact', 'like', "%{$search}%")
+                       ->orWhere('city', 'like', "%{$search}%")
+                       ->orWhere('nit', 'like', "%{$search}%");
                 });
             })
-            ->orderBy('id', 'desc')
+            ->orderByDesc('id')
             ->paginate(12)
             ->withQueryString();
 
-        // Para el modal "cambiar plan" del index
         $plans = Plan::orderBy('price')->get();
 
         return view('admin.companies.index', compact('companies', 'plans'));
     }
 
-    // Formulario de creación
+    /**
+     * Form de creación
+     */
     public function create()
     {
         $company = new Company();
-        $plans   = Plan::orderBy('price')->get(); // por si deseas permitir elegir plan inicial
+        $plans   = Plan::orderBy('price')->get(); // por si eliges plan al crear
         return view('admin.companies.create', compact('company', 'plans'));
     }
 
-    // Guardar
+    /**
+     * Guardar empresa + archivos + (opcional) suscripción
+     */
     public function store(Request $request)
     {
-        $data = $this->validatedData($request);
+        // normaliza color (acepta con/sin #)
+        $request->merge([
+            'color_primary' => $request->color_primary
+                ? (str_starts_with($request->color_primary, '#') ? $request->color_primary : '#'.$request->color_primary)
+                : null,
+        ]);
+
+        $data = $request->validate([
+            'name'           => ['required','string','max:255'],
+            'slug'           => ['nullable','string','max:255','unique:companies,slug'],
+            'sector'         => ['nullable','string','max:255'],
+            'email_contact'  => ['nullable','email','max:255'],
+            'phone_contact'  => ['nullable','string','max:50'],
+            'address'        => ['nullable','string','max:255'],
+            'city'           => ['nullable','string','max:120'],
+            'nit'            => ['nullable','string','max:30'],
+            'color_primary'  => ['nullable','regex:/^#?[0-9a-fA-F]{6}$/'],
+            'plan_id'        => ['nullable','exists:plans,id'],
+            'is_active'      => ['nullable','boolean'],
+
+            // archivos (puedes añadir dimensions más adelante si quieres)
+            'logo'           => ['nullable','mimes:png,jpg,jpeg,webp','max:2048'],
+            'banner'         => ['nullable','mimes:png,jpg,jpeg,webp','max:4096'],
+        ]);
 
         if (empty($data['slug'])) {
-            $data['slug'] = Str::slug($data['name']);
+            $data['slug'] = $this->generateUniqueSlug($request->name);
         }
 
-        $company = Company::create($data);
+        $data['is_active'] = $request->boolean('is_active');
 
-        $this->saveBrandingImages($company, $request);
-        $company->save();
+        DB::transaction(function () use (&$company, $data, $request) {
+            // 1) Crear empresa sin rutas de archivos
+            $company = Company::create(collect($data)->except(['logo','banner'])->toArray());
 
-        // Asignar plan inicial (por defecto Startup = id 1, ajusta si deseas)
-        $initialPlanId = $request->input('initial_plan_id', 1);
-        $plan = Plan::find($initialPlanId) ?? Plan::first();
+            // 2) Subidas (se guardan y se actualiza logo_url / banner_url)
+            $this->handleUploads($company, $request);
 
-        if ($plan) {
-            Subscription::create([
-                'company_id'        => $company->id,
-                'plan_id'           => $plan->id,
-                'start_date'        => now()->toDateString(),
-                'end_date'          => null,
-                'status'            => 'active',
-                'price'             => $plan->price ?? null,
-                'last_payment_date' => null,
-                'next_billing_date' => null, // si manejas cobro mensual, puedes setear now()->addMonth()
-            ]);
-        }
+            // 3) (Opcional) crear suscripción activa inicial si vino plan_id
+            if ($request->filled('plan_id')) {
+                $plan = Plan::find($request->plan_id);
+                Subscription::create([
+                    'company_id'        => $company->id,
+                    'plan_id'           => $plan->id,
+                    'status'            => 'active',
+                    'start_date'        => now()->toDateString(),
+                    'end_date'          => null,
+                    'price'             => $plan->price,
+                    'last_payment_date' => null,
+                    'next_billing_date' => now()->addMonth()->toDateString(),
+                ]);
 
-        return redirect()
-            ->route('admin.companies.index')
-            ->with('success', 'Empresa creada correctamente.');
+                // (opcional) reflejar plan_id también en companies si quieres
+                $company->update(['plan_id' => $plan->id]);
+            }
+        });
+
+        return redirect()->route('admin.companies.index')->with('success', 'Empresa creada correctamente.');
     }
 
-    // Formulario de edición
+    /**
+     * Form de edición
+     */
     public function edit(Company $company)
     {
-        $plans = Plan::orderBy('price')->get(); // por si quieres mostrar plan en el form
+        $plans = Plan::orderBy('price')->get(); // para mostrar plan en el form si quieres
         return view('admin.companies.edit', compact('company', 'plans'));
     }
 
-    // Actualizar
+    /**
+     * Actualizar empresa + archivos + (opcional) cambio de plan
+     */
     public function update(Request $request, Company $company)
     {
-        $data = $this->validatedData($request);
+        $request->merge([
+            'color_primary' => $request->color_primary
+                ? (str_starts_with($request->color_primary, '#') ? $request->color_primary : '#'.$request->color_primary)
+                : null,
+        ]);
+
+        $data = $request->validate([
+            'name'           => ['required','string','max:255'],
+            'slug'           => ['nullable','string','max:255', Rule::unique('companies','slug')->ignore($company->id)],
+            'sector'         => ['nullable','string','max:255'],
+            'email_contact'  => ['nullable','email','max:255'],
+            'phone_contact'  => ['nullable','string','max:50'],
+            'address'        => ['nullable','string','max:255'],
+            'city'           => ['nullable','string','max:120'],
+            'nit'            => ['nullable','string','max:30'],
+            'color_primary'  => ['nullable','regex:/^#?[0-9a-fA-F]{6}$/'],
+            'plan_id'        => ['nullable','exists:plans,id'],
+            'is_active'      => ['nullable','boolean'],
+
+            // archivos
+            'logo'           => ['nullable','mimes:png,jpg,jpeg,webp','max:2048'],
+            'banner'         => ['nullable','mimes:png,jpg,jpeg,webp','max:4096'],
+            'remove_logo'    => ['nullable','boolean'],
+            'remove_banner'  => ['nullable','boolean'],
+        ]);
 
         if (empty($data['slug'])) {
-            $data['slug'] = Str::slug($data['name']);
+            $data['slug'] = $this->generateUniqueSlug($request->name, $company->id);
         }
 
-        $company->fill($data);
+        $data['is_active'] = $request->boolean('is_active');
 
-        $this->saveBrandingImages($company, $request);
-        $company->save();
+        DB::transaction(function () use ($request, $company, $data) {
+            // 1) Eliminar archivos si el usuario lo pidió
+            if ($request->boolean('remove_logo') && $company->logo_url) {
+                Storage::disk('public')->delete(str_replace('/storage/', '', $company->logo_url));
+                $company->logo_url = null;
+            }
+            if ($request->boolean('remove_banner') && $company->banner_url) {
+                Storage::disk('public')->delete(str_replace('/storage/', '', $company->banner_url));
+                $company->banner_url = null;
+            }
+
+            // 2) Subir archivos nuevos (si vienen)
+            $this->handleUploads($company, $request);
+
+            // 3) Actualizar datos base
+            $company->fill(collect($data)->except(['logo','banner','remove_logo','remove_banner'])->toArray());
+            $company->save();
+
+            // 4) Cambio de plan (opcional)
+            if ($request->filled('plan_id')) {
+                $newPlanId     = (int) $request->plan_id;
+                $currentPlanId = (int) optional($company->activeSubscription)->plan_id;
+
+                if (!$currentPlanId || $newPlanId !== $currentPlanId) {
+                    // cerrar suscripción actual
+                    if ($company->activeSubscription) {
+                        $company->activeSubscription->update([
+                            'status'   => 'expired',
+                            'end_date' => now()->toDateString(),
+                        ]);
+                    }
+                    // crear la nueva
+                    $plan = Plan::findOrFail($newPlanId);
+                    Subscription::create([
+                        'company_id'        => $company->id,
+                        'plan_id'           => $plan->id,
+                        'status'            => 'active',
+                        'start_date'        => now()->toDateString(),
+                        'end_date'          => null,
+                        'price'             => $plan->price,
+                        'last_payment_date' => null,
+                        'next_billing_date' => now()->addMonth()->toDateString(),
+                    ]);
+
+                    // (opcional) reflejar plan_id también en companies si quieres
+                    $company->update(['plan_id' => $plan->id]);
+                }
+            }
+        });
 
         return back()->with('success', 'Empresa actualizada correctamente.');
     }
 
-    // (Opcional) Eliminar
+    /**
+     * Eliminar (borra archivos asociados)
+     */
     public function destroy(Company $company)
     {
-        // eliminar archivos
-        $disk = 'public';
-        foreach (['logo_url','banner_url'] as $col) {
+        // elimina archivos si existen
+        foreach (['logo_url', 'banner_url'] as $col) {
             if ($company->{$col}) {
-                $old = str_replace('/storage/', '', $company->{$col});
-                Storage::disk($disk)->delete($old);
+                Storage::disk('public')->delete(str_replace('/storage/', '', $company->{$col}));
             }
         }
-
         $company->delete();
 
-        return back()->with('success', 'Empresa eliminada.');
+        return redirect()->route('admin.companies.index')->with('success', 'Empresa eliminada.');
     }
 
-    // ----------------- Helpers -----------------
+    // ===================== Helpers internos =====================
 
-    private function validatedData(Request $request): array
+    /**
+     * Genera un slug único a partir de un nombre o slug base.
+     */
+    private function generateUniqueSlug(string $base, ?int $ignoreId = null): string
     {
-        return $request->validate([
-            'name'           => ['required','string','max:255'],
-            'slug'           => ['nullable','string','max:255'],
-            'sector'         => ['nullable','string','max:50'],
-            'email_contact'  => ['nullable','email','max:255'],
-            'phone_contact'  => ['nullable','string','max:30'],
-            'color_primary'  => ['nullable','string','max:20'],
-            'is_active'      => ['sometimes','boolean'],
+        $slug = Str::slug($base);
+        $original = $slug;
+        $i = 1;
 
-            // Archivos (logo/banner)
-            // Nota: dimensions no aplica a SVG, por eso separamos
-            'logo_file'      => ['nullable','image','mimes:jpg,jpeg,png,webp','max:1024','dimensions:min_width=300,min_height=100'],
-            'logo_svg'       => ['nullable','mimetypes:image/svg+xml','max:512'],
-            'banner_file'    => ['nullable','image','mimes:jpg,jpeg,png,webp','max:3072','dimensions:min_width=1200,min_height=300'],
-        ],[
-            'logo_file.dimensions'   => 'El logo debe ser horizontal (mínimo 300x100).',
-            'banner_file.dimensions' => 'El banner debe ser horizontal (mínimo 1200x300).',
-        ]);
+        $exists = Company::where('slug', $slug)
+            ->when($ignoreId, fn($q) => $q->where('id', '<>', $ignoreId))
+            ->exists();
+
+        while ($exists) {
+            $slug = "{$original}-{$i}";
+            $i++;
+            $exists = Company::where('slug', $slug)
+                ->when($ignoreId, fn($q) => $q->where('id', '<>', $ignoreId))
+                ->exists();
+        }
+        return $slug;
     }
 
-    private function saveBrandingImages(Company $company, Request $request): void
+    /**
+     * Maneja subida/reemplazo de logo y banner.
+     * Guarda en storage/public/companies/{id}/branding y setea logo_url/banner_url.
+     */
+    private function handleUploads(Company $company, Request $request): void
     {
         $disk = 'public';
         $dir  = "companies/{$company->id}/branding";
         Storage::disk($disk)->makeDirectory($dir);
 
-        // Logo (PNG/JPG/WebP)
-        if ($request->hasFile('logo_file')) {
+        // LOGO
+        if ($request->hasFile('logo')) {
             if ($company->logo_url) {
-                $old = str_replace('/storage/', '', $company->logo_url);
-                Storage::disk($disk)->delete($old);
+                Storage::disk($disk)->delete(str_replace('/storage/', '', $company->logo_url));
             }
-
-            // Si tienes Intervention instalada, optimiza/convierte a webp
-            if (class_exists(Image::class)) {
-                $img = Image::read($request->file('logo_file'));
-                $web = (clone $img)->cover(600, 150)->toWebp(90); // 600x150 recomendado
-                Storage::disk($disk)->put("{$dir}/logo.webp", (string) $web);
-                $company->logo_url = Storage::url("{$dir}/logo.webp");
-            } else {
-                // fallback sin optimización
-                $path = $request->file('logo_file')->store($dir, $disk);
-                $company->logo_url = Storage::url($path);
-            }
+            $path = $request->file('logo')->store($dir, $disk);
+            $company->logo_url = Storage::url($path);
         }
 
-        // Logo SVG (opcional)
-        if ($request->hasFile('logo_svg')) {
-            if ($company->logo_url) {
-                $old = str_replace('/storage/', '', $company->logo_url);
-                Storage::disk($disk)->delete($old);
-            }
-            $request->file('logo_svg')->storeAs($dir, 'logo.svg', $disk);
-            $company->logo_url = Storage::url("{$dir}/logo.svg");
-        }
-
-        // Banner
-        if ($request->hasFile('banner_file')) {
+        // BANNER
+        if ($request->hasFile('banner')) {
             if ($company->banner_url) {
-                $old = str_replace('/storage/', '', $company->banner_url);
-                Storage::disk($disk)->delete($old);
+                Storage::disk($disk)->delete(str_replace('/storage/', '', $company->banner_url));
             }
-
-            if (class_exists(Image::class)) {
-                $img = Image::read($request->file('banner_file'));
-                $web = (clone $img)->cover(1600, 400)->toWebp(88); // 1600x400 recomendado
-                Storage::disk($disk)->put("{$dir}/banner.webp", (string) $web);
-                $company->banner_url = Storage::url("{$dir}/banner.webp");
-            } else {
-                $path = $request->file('banner_file')->store($dir, $disk);
-                $company->banner_url = Storage::url($path);
-            }
+            $path = $request->file('banner')->store($dir, $disk);
+            $company->banner_url = Storage::url($path);
         }
     }
 }
