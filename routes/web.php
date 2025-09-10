@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\PlanController;
 use App\Http\Controllers\Admin\CompanyController;
+use App\Http\Controllers\App\PqrsController;
 
 // ⚠️ Usa el que tengas realmente:
 // Si tu controlador está en: app/Http/Controllers/Public/SignupController.php
@@ -55,6 +56,25 @@ Route::middleware(['auth', 'role:super_admin'])->prefix('admin')->name('admin.')
 
 Route::get('/registro', [SignupController::class, 'create'])->name('signup.create');
 Route::post('/registro', [SignupController::class, 'store'])->name('signup.store');
+
+
+
+// Portal de empresa (usuarios autenticados de una compañía)
+Route::middleware(['auth','verified','company.active'])->prefix('app')->name('app.')->group(function () {
+    // Dashboard de empresa
+    Route::get('/dashboard', [PqrsController::class, 'dashboard'])->name('dashboard');
+
+    // PQRSD: listado y detalle
+    Route::get('/requests', [PqrsController::class, 'index'])->name('requests.index');
+    Route::get('/requests/{id}', [PqrsController::class, 'show'])->name('requests.show');
+
+    // Acciones de gestión (según rol/policy)
+    Route::patch('/requests/{id}/status', [PqrsController::class, 'updateStatus'])->name('requests.updateStatus');
+    Route::patch('/requests/{id}/assign', [PqrsController::class, 'assign'])->name('requests.assign');
+});
+
+
+
 
 
 require __DIR__.'/auth.php';
