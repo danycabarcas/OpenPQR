@@ -18,6 +18,7 @@ public function run()
             CompanySeeder::class,
             DepartmentSeeder::class,
             UserSeeder::class,
+            ThemesSeeder::class,
         ]);
     }
 

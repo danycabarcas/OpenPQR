@@ -1,0 +1,56 @@
+/*
+Template Name: Velzon - Admin & Dashboard Template
+Author: Themesbrand
+Website: https://themesbrand.com/
+Contact: support@themesbrand.com
+File: Custom Css File
+*/
+
+/* Sidebar fijo a la izquierda */
+.app-menu {
+  width: 250px;              /* ancho normal del sidebar */
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: #2a3042;       /* color oscuro */
+  z-index: 1000;
+  overflow-y: auto;
+}
+
+/* Contenido principal con margen */
+.main-content {
+  margin-left: 250px;        /* deja espacio para el sidebar */
+  transition: margin-left .3s ease;
+}
+
+/* Cuando el sidebar está colapsado (sm) */
+html[data-sidebar-size="sm"] .app-menu {
+  width: 70px;
+}
+
+html[data-sidebar-size="sm"] .main-content {
+  margin-left: 70px;
+}
+
+/* Ajustar el topbar para que ocupe todo el ancho */
+#page-topbar {
+  left: 250px;
+  right: 0;
+  position: fixed;
+  top: 0;
+  z-index: 1100;
+  width: calc(100% - 250px);
+  transition: left .3s ease, width .3s ease;
+}
+
+/* Cuando está colapsado */
+html[data-sidebar-size="sm"] #page-topbar {
+  left: 70px;
+  width: calc(100% - 70px);
+}
+
+/* Compensar padding-top en el contenido por el topbar fijo */
+.page-content {
+  padding-top: 70px; /* depende del alto del topbar */
+}

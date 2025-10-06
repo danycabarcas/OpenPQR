@@ -1,6 +1,5 @@
 {{-- resources/views/admin/companies/create.blade.php --}}
-@extends('admin.layouts.app')
-
+@extends('layouts.velzon_admin')
 @section('title', 'Crear empresa')
 
 @section('content')

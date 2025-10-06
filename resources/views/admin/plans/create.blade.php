@@ -1,5 +1,5 @@
 {{-- resources/views/admin/plans/create.blade.php --}}
-@extends('admin.layouts.app')
+@extends('layouts.velzon_admin')
 
 @section('title', 'Nuevo plan')
 

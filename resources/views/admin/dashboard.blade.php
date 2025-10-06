@@ -1,6 +1,5 @@
-@extends('layouts.admin')
-
-@section('title', 'Dashboard')
+@extends('layouts.velzon_admin')
+@section('title','Dashboard Global')
 
 @section('content')
 <div class="container-fluid">

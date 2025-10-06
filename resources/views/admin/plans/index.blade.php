@@ -1,4 +1,4 @@
-@extends('admin.layouts.app')
+@extends('layouts.velzon_admin')
 
 @section('title', 'Planes')
 

@@ -9,12 +9,12 @@
     <title>@yield('title', 'Panel') | OpenPQR</title>
 
     {{-- CSS núcleo Velzon (TU RUTA) --}}
-    <link rel="stylesheet" href="{{ asset('velzon_assets/css/bootstrap.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('velzon_assets/css/icons.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('velzon_assets/css/app.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/libs/bootstrap/css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/icons.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/css/app.min.css') }}">
     {{-- libs que usa el layout (simplebar, waves, etc.) --}}
-    <link rel="stylesheet" href="{{ asset('velzon_assets/libs/simplebar/simplebar.min.css') }}">
-    <link rel="stylesheet" href="{{ asset('velzon_assets/libs/waves/waves.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/libs/simplebar/simplebar.min.css') }}">
+    <link rel="stylesheet" href="{{ asset('assets/libs/node-waves/waves.min.css') }}">
 
     {{-- Si vas a inyectar CSS por página --}}
     @stack('styles')
@@ -73,11 +73,11 @@
 </div>
 
 {{-- JS núcleo Velzon (TU RUTA) --}}
-<script src="{{ asset('velzon_assets/js/bootstrap.bundle.min.js') }}"></script>
-<script src="{{ asset('velzon_assets/libs/simplebar/simplebar.min.js') }}"></script>
-<script src="{{ asset('velzon_assets/libs/waves/waves.min.js') }}"></script>
-<script src="{{ asset('velzon_assets/js/layout.js') }}"></script>
-<script src="{{ asset('velzon_assets/js/app.min.js') }}"></script>
+<script src="{{ asset('assets/libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ asset('assets/libs/simplebar/simplebar.min.js') }}"></script>
+<script src="{{ asset('assets/libs/node-waves/waves.min.js') }}"></script>
+<script src="{{ asset('assets/js/layout.js') }}"></script>
+<script src="{{ asset('assets/js/app.js') }}"></script>
 
 {{-- scripts por página --}}
 @stack('scripts')

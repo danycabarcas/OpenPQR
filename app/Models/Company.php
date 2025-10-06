@@ -59,6 +59,13 @@ class Company extends Model
         // return $this->hasOne(Subscription::class)->latestOfMany();
     }
 
+
+    // FUction
+    public function theme()
+    {
+        return $this->belongsTo(\App\Models\Theme::class);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Accessors / Mutators

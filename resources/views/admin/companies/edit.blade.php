@@ -1,5 +1,5 @@
 {{-- resources/views/admin/companies/edit.blade.php --}}
-@extends('admin.layouts.app')
+@extends('layouts.velzon_admin')
 
 @section('title', 'Editar empresa')
 

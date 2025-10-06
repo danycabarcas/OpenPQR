@@ -1,0 +1,67 @@
+:root{
+  --brand: #0d6efd;           /* Bootstrap primary */
+  --sidebar-w: 260px;
+  --sidebar-w-collapsed: 76px;
+  --radius: 16px;
+}
+
+/* Layout */
+#sidebar{
+  width: var(--sidebar-w);
+  min-height: 100vh;
+  position: sticky;
+  top: 0;
+}
+#app.sidebar-collapsed #sidebar{
+  width: var(--sidebar-w-collapsed);
+}
+#app.sidebar-collapsed #sidebar .menu-link span{ display: none; } /* si quieres ocultar textos */
+#app.sidebar-collapsed #sidebar .menu-link i{ margin-right: 0; }
+#app.sidebar-collapsed .navbar{ padding-left: .5rem; }
+
+/* Menú */
+.menu-link{
+  display: flex;
+  align-items: center;
+  gap: .25rem;
+  padding: .625rem .75rem;
+  border-radius: .5rem;
+  color: var(--bs-body-color);
+  text-decoration: none;
+  margin-bottom: .25rem;
+}
+.menu-link:hover{ background: var(--bs-light); }
+.menu-link.active{
+  background: rgba(13,110,253,.12);
+  color: var(--brand);
+  font-weight: 600;
+}
+
+/* Cards material-ish */
+.card{
+  border: none;
+  border-radius: var(--radius);
+  box-shadow: 0 6px 18px rgba(0,0,0,.06);
+}
+.card .card-header{
+  border: none;
+  background: transparent;
+}
+
+/* Badges SLA */
+.badge-success{ background-color: #16a34a !important; }
+.badge-warning{ background-color: #f59e0b !important; color:#111 !important; }
+.badge-danger{  background-color: #dc2626 !important; }
+
+/* Ripple (opcional: usa la clase .ripple en botones/links) */
+.ripple{ position: relative; overflow: hidden; }
+.ripple:after{
+  content:""; position:absolute; inset:0; border-radius:inherit; transform:scale(0);
+  background: rgba(13,110,253,.2); opacity:0; transition: transform .35s, opacity .6s;
+}
+.ripple:active:after{ transform:scale(1); opacity:1; transition:0s; }
+
+/* Responsivo */
+@media (max-width: 991.98px){
+  #sidebar{ display:none; }               /* oculto en móvil (usamos offcanvas) */
+}
